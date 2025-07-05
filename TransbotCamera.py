@@ -27,11 +27,11 @@ class TransbotCamera:
         # 角度范围定义
         self.HORIZONTAL_MIN = 0         # 水平最小角度
         self.HORIZONTAL_MAX = 180       # 水平最大角度
-        self.HORIZONTAL_CENTER = 90     # 水平中心角度
+        self.HORIZONTAL_CENTER = 80     # 水平中心角度
         
         self.VERTICAL_MIN = 0           # 垂直最小角度
         self.VERTICAL_MAX = 180         # 垂直最大角度
-        self.VERTICAL_CENTER = 90       # 垂直中心角度
+        self.VERTICAL_CENTER = 75       # 垂直中心角度
         
         # 预设角度位置
         self.PRESET_POSITIONS = {
