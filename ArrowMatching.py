@@ -406,224 +406,145 @@ def show_final_results(stats):
     
     print(f"{'='*50}")
 
+from TransbotCamera import TransbotCamera
 
+def detect_most_frequent_arrow(duration: float = 10.0, show_gui: bool = True, camera_id: int = 0) -> str:
+    """
+    在指定时间内持续检测箭头，并返回出现次数最多的方向。
 
-def arrow_statistics(show_gui=True):
-    """箭头统计检测，返回最常见的箭头方向"""
-    print("=== 箭头统计检测 ===")
+    :param duration: 检测持续时间（秒）。
+    :param show_gui: 是否显示GUI界面。
+    :param camera_id: 要使用的摄像头ID。
+    :return: 出现最多的箭头方向字符串 ('LEFT', 'RIGHT', 'STRAIGHT') 或 'UNKNOWN'。
+    """
+    print(f"--- 开始箭头检测，持续时间: {duration}秒 ---")
 
-    interval = 10  # 统计间隔时间
-    duration = 10  # 总时间
-    
-    # 初始化摄像头
-    cap = cv2.VideoCapture(0)
-    
-    if not cap.isOpened():
-        print("无法打开摄像头")
-        return "ERROR: 无法打开摄像头"
-    
-    # 设置摄像头参数
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-
-    cap.set
-    
-    # 初始化箭头检测器和统计器
+    # 1. 初始化组件
+    camera = TransbotCamera(debug=False)
     detector = ArrowDetector(debug=False)
-    stats = ArrowStatistics(interval_seconds=interval, total_duration=duration, debug=False)
-    
-    print(f"\n开始箭头统计检测，持续时间: {duration}秒")
-    print(f"显示GUI: {'是' if show_gui else '否'}")
-    
-    frame_count = 0
-    last_progress_time = 0
-    
-    # 开始统计
-    stats.start_time = time.time()
-    stats.last_reset_time = time.time()
-    
-    # 全程统计计数器
-    total_arrow_counts = Counter()
-    
+    total_counts = Counter()
+
+    # 2. 初始化摄像头
+    if not camera.initialize_camera(camera_id=camera_id):
+        print("错误: 摄像头初始化失败。")
+        return "ERROR: Camera initialization failed."
+
+    # 3. 开始检测循环
+    start_time = time.time()
     try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("无法读取摄像头")
-                break
-            
-            frame_count += 1
-            
+        while time.time() - start_time < duration:
+            # 获取摄像头帧
+            ret, frame = camera.get_camera_frame()
+            if not ret or frame is None:
+                print("警告: 无法读取摄像头帧。")
+                time.sleep(0.1)
+                continue
+
             # 检测箭头
             results = detector.detect_arrows(frame)
-            
-            # 添加检测结果到总统计
-            for result in results:
-                direction, contour, bbox = result
+
+            # 更新统计
+            for direction, _, _ in results:
                 if direction != ArrowDirection.UNKNOWN:
-                    total_arrow_counts[direction] += 1
-                    stats.add_detection(direction)
-                    print(f"检测到箭头: {direction.value}")  # 实时显示检测结果
-            
-            # 如果需要显示GUI
+                    total_counts[direction] += 1
+
+            # 如果需要，显示GUI
             if show_gui:
-                # 复制原始帧
                 display_frame = frame.copy()
-                
                 # 绘制检测结果
-                if results:
-                    for result in results:
-                        direction, contour, bbox = result
-                        x, y, w, h = bbox
-                        
-                        # 根据方向选择颜色
-                        if direction == ArrowDirection.LEFT:
-                            color = (255, 0, 0)  # 蓝色
-                        elif direction == ArrowDirection.RIGHT:
-                            color = (0, 0, 255)  # 红色
-                        elif direction == ArrowDirection.STRAIGHT:
-                            color = (0, 255, 0)  # 绿色
-                        else:
-                            color = (128, 128, 128)  # 灰色
-                        
-                        # 绘制边界框
-                        cv2.rectangle(display_frame, (x, y), (x + w, y + h), color, 2)
-                        
-                        # 绘制轮廓
-                        if contour is not None:
-                            cv2.drawContours(display_frame, [contour], -1, color, 2)
-                        
-                        # 添加标签
-                        label = f"{direction.value}"
-                        cv2.putText(display_frame, label, (x, y - 10), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-                
-                # 添加简单的状态信息
-                add_simple_status_overlay(display_frame, stats, total_arrow_counts)
-                
-                # 显示图像
-                try:
-                    cv2.imshow('Arrow Statistics Detection', display_frame)
-                    # 检查按键
-                    key = cv2.waitKey(1) & 0xFF
-                    if key == 27 or key == ord('q'):  # ESC 或 'q' 键退出
-                        print("用户中断检测")
-                        break
-                except Exception as e:
-                    print(f"GUI显示错误: {e}")
-                    show_gui = False  # 禁用GUI继续运行
-                    print("切换到无GUI模式")
-            
-            # 检查是否完成
-            if stats.is_finished():
-                break
-            
-            # 改进的进度显示
-            current_time = time.time()
-            if current_time - last_progress_time >= 2.0:  # 每2秒显示一次
-                elapsed = stats.get_elapsed_time()
-                progress = (elapsed / duration) * 100
-                print(f"检测进度: {elapsed:.1f}/{duration}秒 ({progress:.1f}%)")
-                print(f"当前统计: 左转={total_arrow_counts.get(ArrowDirection.LEFT, 0)}, "
-                      f"右转={total_arrow_counts.get(ArrowDirection.RIGHT, 0)}, "
-                      f"直行={total_arrow_counts.get(ArrowDirection.STRAIGHT, 0)}")
-                last_progress_time = current_time
+                for direction, contour, bbox in results:
+                    x, y, w, h = bbox
+                    color = (255, 0, 0) if direction == ArrowDirection.LEFT else \
+                            (0, 0, 255) if direction == ArrowDirection.RIGHT else \
+                            (0, 255, 0) if direction == ArrowDirection.STRAIGHT else \
+                            (128, 128, 128)
+                    cv2.rectangle(display_frame, (x, y), (x + w, y + h), color, 2)
+                    cv2.putText(display_frame, direction.value, (x, y - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+                # 添加状态信息
+                _add_detection_overlay(display_frame, time.time() - start_time, duration, total_counts)
+                cv2.imshow('Arrow Detection', display_frame)
+
+                # 按 'q' 退出
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    print("用户提前退出。")
+                    break
     
     except KeyboardInterrupt:
-        print("\n用户中断检测")
-    except Exception as e:
-        print(f"检测过程中发生错误: {e}")
+        print("用户中断了检测。")
     finally:
-        # 清理资源
-        cap.release()
+        # 4. 清理资源
+        print("--- 检测结束，正在清理资源 ---")
+        camera.close_camera()
         if show_gui:
             cv2.destroyAllWindows()
+
+    # 5. 计算并返回结果
+    print("\n--- 最终统计结果 ---")
+    if not total_counts:
+        print("未检测到任何有效箭头。")
+        return ArrowDirection.UNKNOWN.name
+
+    # 打印所有检测到的箭头及其计数
+    for direction, count in total_counts.items():
+        print(f"  {direction.value}: {count} 次")
+
+    # 找到最常见的箭头
+    most_common_direction, count = total_counts.most_common(1)[0]
+    print(f"\n出现最多的箭头是: {most_common_direction.value} (共 {count} 次)")
+
+    return most_common_direction.name
+
+
+def _add_detection_overlay(image, elapsed_time, total_duration, counts):
+    """在图像上添加一个简单的信息覆盖层"""
+    h, w, _ = image.shape
     
-    # 返回最常见的箭头方向
-    if total_arrow_counts:
-        most_common_direction, count = total_arrow_counts.most_common(1)[0]
-        result = most_common_direction.value
-        print(f"\n统计完成，最常见箭头方向: {result} (出现{count}次)")
-        
-        # 显示详细统计
-        print(f"详细统计:")
-        for direction, count in total_arrow_counts.items():
-            print(f"  {direction.value}: {count}次")
-        
-        return result
-    else:
-        print("统计完成，未检测到任何箭头")
-        return "未检测到箭头"
+    # 绘制半透明背景
+    overlay = image.copy()
+    cv2.rectangle(overlay, (0, h - 60), (w, h), (0, 0, 0), -1)
+    cv2.addWeighted(overlay, 0.6, image, 0.4, 0, image)
 
-def add_simple_status_overlay(image, stats, total_counts):
-    """添加简单的状态信息覆盖层"""
-    try:
-        height, width = image.shape[:2]
-        
-        # 创建半透明背景
-        overlay = image.copy()
-        alpha = 0.8
-        
-        # 状态面板
-        panel_height = 80
-        panel_y = height - panel_height
-        
-        cv2.rectangle(overlay, (0, panel_y), (width, height), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
-        
-        # 文本设置
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.6
-        font_color = (255, 255, 255)
-        font_thickness = 2
-        line_height = 25
-        
-        y_offset = panel_y + 25
-        
-        # 时间信息
-        elapsed = stats.get_elapsed_time()
-        progress = (elapsed / stats.total_duration) * 100
-        
-        cv2.putText(image, f"Time: {elapsed:.1f}s/{stats.total_duration:.1f}s ({progress:.1f}%)", 
-                   (10, y_offset), font, font_scale, font_color, font_thickness)
-        y_offset += line_height
-        
-        # 统计信息
-        left_count = total_counts.get(ArrowDirection.LEFT, 0)
-        right_count = total_counts.get(ArrowDirection.RIGHT, 0)
-        straight_count = total_counts.get(ArrowDirection.STRAIGHT, 0)
-        total = sum(total_counts.values())
-        
-        cv2.putText(image, f"Detected: L={left_count} R={right_count} S={straight_count} Total={total}", 
-                   (10, y_offset), font, font_scale, (0, 255, 255), font_thickness)
-        y_offset += line_height
-        
-        # 当前最多的方向
-        if total_counts:
-            most_common = total_counts.most_common(1)[0]
-            cv2.putText(image, f"Most Common: {most_common[0].value} ({most_common[1]} times)", 
-                       (10, y_offset), font, font_scale, (255, 0, 255), font_thickness)
-        
-    except Exception as e:
-        print(f"添加状态覆盖层失败: {e}")
+    # 准备文本
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    
+    # 时间和进度
+    progress = (elapsed_time / total_duration) * 100
+    time_text = f"Time: {elapsed_time:.1f}s / {total_duration:.0f}s ({progress:.1f}%)"
+    cv2.putText(image, time_text, (10, h - 35), font, 0.6, (255, 255, 255), 2)
 
-# 添加无GUI版本
-def arrow_statistics_no_gui():
-    """无GUI版本的箭头统计"""
-    return arrow_statistics(show_gui=False)
+    # 统计计数
+    left = counts.get(ArrowDirection.LEFT, 0)
+    right = counts.get(ArrowDirection.RIGHT, 0)
+    straight = counts.get(ArrowDirection.STRAIGHT, 0)
+    count_text = f"Counts: L={left}, R={right}, S={straight}"
+    cv2.putText(image, count_text, (10, h - 10), font, 0.6, (0, 255, 255), 2)
 
-# 修改主函数
+
+# 在主函数中添加一个测试入口
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) > 1:
-        if sys.argv[1] == 'nogui':
-            result = arrow_statistics_no_gui()
-        elif sys.argv[1] == 'debug':
-            debug_arrow_statistics()
-        else:
-            result = arrow_statistics()
+    # 根据命令行参数选择运行模式
+    if len(sys.argv) > 1 and sys.argv[1] == 'detect':
+        # 运行新的检测函数
+        # 示例: python ArrowMatching.py detect 15 nogui
+        #       (检测15秒，不显示GUI)
+        
+        run_duration = float(sys.argv[2]) if len(sys.argv) > 2 else 10.0
+        run_gui = False if len(sys.argv) > 3 and sys.argv[3] == 'nogui' else True
+        
+        final_result = detect_most_frequent_arrow(duration=run_duration, show_gui=run_gui)
+        print(f"\n[函数返回值]: {final_result}")
+
+    elif len(sys.argv) > 1 and sys.argv[1] == 'debug':
+        # 运行原始的调试函数
+        debug_arrow_statistics()
     else:
-        result = arrow_statistics()
-    
-    print(f"最终结果: {result}")
+        # 默认运行新的检测函数
+        print("默认模式: 运行10秒箭头检测 (带GUI)")
+        print("使用 'python ArrowMatching.py debug' 运行完整调试版本")
+        print("使用 'python ArrowMatching.py detect <秒数> [nogui]' 自定义运行")
+        final_result = detect_most_frequent_arrow(duration=10.0, show_gui=True)
+        print(f"\n[函数返回值]: {final_result}")
