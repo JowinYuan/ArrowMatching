@@ -7,10 +7,10 @@ from typing import Tuple, List, Dict
 
 class ArrowDirection(Enum):
     """箭头方向枚举"""
-    LEFT = "左转"
-    RIGHT = "右转"
-    STRAIGHT = "直行"
-    UNKNOWN = "未知"
+    LEFT = "Left"
+    RIGHT = "Right"
+    STRAIGHT = "Straight"
+    UNKNOWN = "Unknow"
 
 class ArrowDetector:
     def __init__(self, debug: bool = False):
