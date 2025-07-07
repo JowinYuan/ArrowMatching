@@ -31,6 +31,8 @@ class FaceDetector:
                 print("人脸检测模型加载失败")
             raise Exception("人脸检测模型加载失败")
         
+        self.camera.move_to_preset('home')
+
         # 人脸检测参数
         self.scale_factor = 1.1  # 图像缩放因子
         self.min_neighbors = 5   # 最小邻居数
@@ -270,6 +272,10 @@ class FaceDetector:
                             user_type = "主人" if is_host else "客人"
                             print(f"人脸检测成功！识别为{user_type}")
                         
+                        # 关闭显示窗口（在播放音频前关闭）
+                        if show_window:
+                            cv2.destroyAllWindows()
+                        
                         # 播放对应的欢迎音频
                         if self.play_welcome_audio(is_host):
                             if self.debug:
@@ -277,14 +283,13 @@ class FaceDetector:
                         else:
                             if self.debug:
                                 print("欢迎音频播放失败")
-                    
+                        
+                        # 无论是否为调试模式，都应该结束程序
                         if self.debug:
                             print("人脸检测和音频播放完成，程序结束")
-                            return True  # 返回成功并结束程序
                         
-                        # 关闭显示窗口
-                        if show_window:
-                            cv2.destroyAllWindows()
+                        # 在这里不调用 self.close()，让调用者决定何时关闭
+                        return True
                 
                 else:
                     # 没有检测到人脸，重置计数
@@ -321,7 +326,10 @@ class FaceDetector:
                         is_host = False
                         if self.debug:
                             print("切换为客人模式")
-            
+
+            # 循环结束后关闭资源
+            if self.debug:
+                print("检测循环结束")
             return False
             
         except KeyboardInterrupt:
@@ -467,33 +475,6 @@ def test_face_detection():
 
 
 if __name__ == "__main__":
-    # 选择测试模式
-    print("选择测试模式:")
-    print("1. 兼容性测试 (使用 Face 函数)")
-    print("2. 类测试 (使用 FaceDetector 类)")
-    print("3. 交互式测试 (显示检测窗口)")
-    
-    choice = input("请输入选择 (1/2/3): ").strip()
-    
-    if choice == "1":
-        # 兼容性测试
-        print("兼容性测试开始...")
-        result = Face()
-        print(f"检测结果: {'成功' if result else '失败'}")
-        
-    elif choice == "2":
-        # 类测试
         detector = FaceDetector(debug=True)
-        try:
-            detector.initialize()
-            result = detector.detect_and_process(show_window=False, is_host=True)
-            print(f"检测结果: {'成功' if result else '失败'}")
-        finally:
-            detector.close()
-            
-    elif choice == "3":
-        # 交互式测试
-        test_face_detection()
-        
-    else:
-        print("无效选择")
+        detector.initialize()
+        result = detector.detect_and_process(show_window=True, is_host=True)
