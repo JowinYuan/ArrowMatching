@@ -31,7 +31,7 @@ class ArrowDetector:
         self.gray_threshold = 25
         
         # 轮廓检测参数 - 放宽条件
-        self.min_contour_area = 200      # 适当提高最小面积
+        self.min_contour_area = 300      # 适当提高最小面积
         self.max_contour_area = 50000    # 提高最大面积
         
         # ROI参数
